@@ -16,6 +16,11 @@ pipeline {
             defaultValue: 'DEPLOY_KEY',
             description: 'Credentials ID for the deployment API key (Secret Text)'
         )
+        string(
+            name: 'VITE_CANDIDATES_ENDPOINT',
+            defaultValue: 'VITE_CANDIDATES_ENDPOINT',
+            description: 'Endpoint for candidates API used by the frontend (exported into .env)'
+        )
     }
 
     stages {
@@ -25,41 +30,23 @@ pipeline {
             }
         }
 
-        stage('Env setup') {
+        stage('Setup .env') {
             steps {
-                sh 'python3 -m venv .venv'
+                sh "echo 'VITE_CANDIDATES_ENDPOINT=${params.VITE_CANDIDATES_ENDPOINT}' > .env"
+                sh 'echo ".env created with VITE_CANDIDATES_ENDPOINT"'
             }
         }
 
-        stage('Install requirements') {
+        stage('Install dependencies') {
             steps {
-                sh '.venv/bin/pip install -r requirements.txt'
+                sh 'node -v && npm --version && (npm ci || npm install)'
             }
         }
 
-        stage('Migrations') {
+        // Skipping explicit install of test libraries because they are already in devDependencies
+        stage('Run tests') {
             steps {
-                sh '.venv/bin/python manage.py makemigrations'
-                sh '.venv/bin/python manage.py migrate'
-            }
-        }
-
-        stage('Unit Tests') {
-            steps {
-                sh '.venv/bin/python manage.py test'
-            }
-        }
-
-        stage('Start Server') {
-            steps {
-                sh '.venv/bin/python manage.py runserver 0.0.0.0:8000 &'
-                sh 'sleep 5' // wait for server to boot
-            }
-        }
-
-        stage('API Test') {
-            steps {
-                sh '.venv/bin/python check.py'
+                sh 'npm test -- --run'
             }
         }
     }
